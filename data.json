@@ -1,0 +1,22 @@
+{
+	"office_hours":{
+		"work": {
+			"start_time": "8.00",
+			"end_time": "20.00"
+		},
+		"lunch": {
+			"start_time": "14.00",
+			"end_time": "15.00"
+		}	
+	},
+	"meetings":[
+		{
+			"start_time": "8.00",
+			"end_time": "14.00"
+		},
+		{
+			"start_time": "15.30",
+			"end_time": "17.00"
+		}
+	]
+}

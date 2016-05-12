@@ -1,0 +1,226 @@
+<!DOCTYPE HTML>
+<html lang="en">
+	<head>
+		<!-- title -->
+		<title>Cognizant Test 10-05-2016</title>
+		<!-- meta -->
+		<meta charset='utf-8' />
+		<meta name='author' content='zooduck, wesley pumpkinhead' />
+		<meta name='viewport' content='width=device-width, initial-scale=1' />		
+		<!-- style -->
+		<style>
+			*{
+				box-sizing: border-box;
+			}
+			body{
+				margin: 0 auto;
+				text-align: center;
+				padding: 15px;
+				font: normal 16px calibri, sans-serif;
+			}
+
+			h1{
+				background: #eee;
+				padding: 10px;
+			}
+			.container{
+				display: block;
+				max-width: 1024px;				
+				margin-left: auto;
+				margin-right: auto;			
+			}
+			#canvas_timeline{
+				margin-left: auto;
+				margin-right: auto;			
+			}
+			.container::after{
+				content:'';
+				display:block;
+				width: 100%;
+				height: 10px;
+				border: solid 0px #ccc;
+				border-bottom-width: 1px;
+			}
+		</style>		
+	</head>
+	<body>
+
+		<header>
+			<h1>Cognizant Test 10-05-2016</h1>			
+		</header>
+
+		<div class='container' id='container'>
+			<canvas id="canvas_timeline" width="120" height="40"></canvas>
+		</div>
+
+		<!-- script -->
+		<script>
+			'use strict';		
+
+			class Timeline{
+				// constructor
+				constructor(canvas_el){
+					// set canvas element
+					this.canvas = canvas_el;
+					this.ctx = this.canvas.getContext('2d');					
+					// set Timeline config
+					this.config = {
+						marker:{
+							width: 5,
+							height: 25
+						},
+						total_hours: 12,
+						offset_minutes: 480
+					},
+					this.markers = [],
+					this.meetings = [],
+					this.errors = []								
+				}
+				// helper
+				toMinutes(time_string){
+					return parseInt(time_string.split(".")[0] * 60) + parseInt(time_string.split(".")[1]);
+				}
+
+
+				addMeetings(){
+					this.meetings = [];
+					var _this = this;
+					var pixels_per_minute = this.canvas.offsetWidth / (this.config.total_hours * 60);
+					this.data.meetings.forEach(function(obj, index, arr) {
+						var duration = _this.toMinutes(obj.end_time) - _this.toMinutes(obj.start_time);									
+						_this.meetings.push({left: (_this.toMinutes(obj.start_time) - _this.config.offset_minutes) * pixels_per_minute, width: duration * pixels_per_minute});
+					});					
+				}
+
+				addMarkers(){
+								
+					var _this = this;
+					var pixels_per_minute = this.canvas.offsetWidth / (this.config.total_hours * 60);				
+					this.markers = [];
+
+					var office_hours = this.data.office_hours;
+					for(var i in office_hours) {
+						_this.markers.push({left: (_this.toMinutes(office_hours[i].start_time) - _this.config.offset_minutes) * pixels_per_minute, time: office_hours[i].start_time});
+						_this.markers.push({left: (_this.toMinutes(office_hours[i].end_time) - _this.config.offset_minutes) * pixels_per_minute, time: office_hours[i].end_time});
+					}
+
+
+					this.data.meetings.forEach(function(meeting, index, arr) {
+						_this.markers.push({left: (_this.toMinutes(meeting.start_time) - _this.config.offset_minutes) * pixels_per_minute, time: meeting.start_time});
+						_this.markers.push({left: (_this.toMinutes(meeting.end_time) - _this.config.offset_minutes) * pixels_per_minute, time: meeting.end_time});
+					});			
+				}				
+
+				drawMarkers(){					
+					
+					this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+					this.ctx.fillStyle = '#ccc';
+					this.ctx.fillRect(0, 15, this.canvas.width, this.canvas.height);
+
+					this.addMeetings();
+					this.addMarkers();					
+				
+					var _this = this;
+					this.meetings.forEach(function(meeting, index, arr) {						
+						_this.ctx.fillStyle = 'green';
+						_this.ctx.fillRect(meeting.left, 15, meeting.width, _this.config.marker.height);						
+					});
+
+					var align;					
+					this.markers.forEach(function(marker, index, arr) {						
+						_this.ctx.fillStyle = '#222';
+						_this.ctx.fillRect(!marker.left || marker.left - _this.config.marker.width, 15, _this.config.marker.width, _this.config.marker.height);			
+						_this.ctx.fillStyle = '#222';
+						var text_width = _this.ctx.measureText(marker.time).width;						
+						if(!marker.left){
+							align = 'start';
+						}else if(marker.left - _this.config.marker.width + text_width > _this.canvas.width){
+							align = 'right';
+						}else{
+							align = 'center';
+						}
+						_this.ctx.textAlign = align;
+						_this.ctx.font = "12px Arial";
+						_this.ctx.textBaseline = 'hanging';		
+
+						_this.ctx.fillText(marker.time, !marker.left || marker.left - _this.config.marker.width, 2);
+					});				
+				}
+
+				isValid(data){
+					var _this = this;
+					data.meetings.forEach(function(obj, index, arr) {						
+						if(parseInt(obj.end_time) <= parseInt(obj.start_time)){							
+							_this.errors.push("Error -> JSON Data: end_time must be greater than start_time!");							
+						}
+					});					
+					for(var i in data.office_hours){						
+						if(parseInt(data.office_hours[i].end_time) <= parseInt(data.office_hours[i].start_time)){
+							_this.errors.push("Error -> JSON Data: end_time must be greater than start_time!");							
+						}
+					}
+					if(this.errors.length > 0){
+						return false;
+					}
+					return true;				
+				}		
+
+				getDataFn(){
+					var _this = this;
+					var promise = new Promise(function(resolve, reject){
+						var xhr = new XMLHttpRequest();
+						xhr.open('GET', 'data.json', true);
+						xhr.send();			
+						xhr.onload = function(){
+							if(this.status >= 200 && this.status <= 300){
+								var data = JSON.parse(xhr.responseText);								
+								_this.data = data;									
+								if(_this.isValid(data)){
+									resolve(this.responseText);
+								}else{									
+									reject();
+								}									
+							}else{
+								reject(this.statusText);
+							}											
+						}
+						xhr.onerror = function(){
+							reject(this.statusText);
+						}
+					})
+					return promise;						
+				}
+
+				getData(){					
+					var _this = this;
+					this.getDataFn().then(function(result){									
+						_this.drawMarkers();
+					// });
+					}).catch(function(){						
+						_this.errors.forEach(function(msg, index, arr) {
+							console.log(msg);							
+						});						
+					});
+				}	
+			}
+
+		    var timeline = new Timeline(document.getElementById('canvas_timeline'));		   
+		    timeline.getData();		   
+
+			var resizeTimeline = function(){
+				var inner_width = window.innerWidth || document.documentElement.clientWidth;
+				var width = document.getElementById('container').offsetWidth;
+				if(document.getElementById('canvas_timeline').width != width){
+					document.getElementById('canvas_timeline').width = width;
+				}				
+				timeline.getData();
+			}
+			window.addEventListener('resize', function() {
+				resizeTimeline();
+			});
+			// init
+			resizeTimeline();
+		</script>
+
+	</body>
+</html>
