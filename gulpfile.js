@@ -13,8 +13,7 @@ gulp.task('http-server', function() {
 gulp.task('open', ['http-server'], function() {
 	gulp.src('')
 		.pipe(open({
-			uri: 'http://localhost:8080/meetings.html',
-			app: 'chrome'
+			uri: 'http://localhost:8080/meetings.html'
 		}));
 });
 
